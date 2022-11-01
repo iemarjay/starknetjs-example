@@ -15,14 +15,11 @@ export default function Home() {
 
     async function connectWallet() {
         try {
-            const starknet = await connect();
-            await starknet?.enable({starknetVersion: "v4"})
+            const mainContract = await StarknetMainContract.connectWeb3Wallet()
+            addressNameMap = new AddressNameMap(mainContract);
 
-            setAddress(starknet?.selectedAddress)
+            setAddress(mainContract.connectedAddress)
             setIsConnected(true)
-
-            if (starknet?.account && starknet?.provider)
-                addressNameMap = new AddressNameMap(starknet.account, starknet.provider);
 
         } catch (e) {
             alert(e.message)
@@ -72,18 +69,20 @@ export default function Home() {
                             <p>What name do you want?.</p>
 
                             <div className="cardForm">
-                                <input type="text" className="input" placeholder="Enter Name" onChange={(e) => setName(e.target.value)} />
+                                <input type="text" className="input" placeholder="Enter Name"
+                                       onChange={(e) => setName(e.target.value)}/>
 
-                                <input type="submit" className="button" value="Store Name" onClick={setNameFunction} />
+                                <input type="submit" className="button" value="Store Name" onClick={setNameFunction}/>
                             </div>
 
-                            <hr />
+                            <hr/>
 
                             <p>Insert a wallet address, to retrieve its name.</p>
                             <div className="cardForm">
-                                <input type="text" className="input" placeholder="Enter Address" onChange={(e) => setInputAddress(e.target.value)} />
+                                <input type="text" className="input" placeholder="Enter Address"
+                                       onChange={(e) => setInputAddress(e.target.value)}/>
 
-                                <input type="submit" className="button" value="Get Name" onClick={getNameFunction} />
+                                <input type="submit" className="button" value="Get Name" onClick={getNameFunction}/>
                             </div>
                             <p>Name: {retrievedName}.eth</p>
                         </div>
@@ -96,32 +95,67 @@ export default function Home() {
 
 const contractAddress = "0x049e5c0e9fbb072d7f908e77e117c76d026b8daf9720fe1d74fa3309645eabce"
 
-class AddressNameMap {
-    private readonly account: AccountInterface;
-    private readonly provider: ProviderInterface;
+
+interface MainContract {
+    storeName(name: string): void
+
+    getName(address: string): Promise<string>
+}
+
+class StarknetMainContract implements MainContract {
     private readonly readerContract: Contract;
     private readonly writerContract: Contract;
 
+    private _connectedAddress: string | undefined;
+
     constructor(account: AccountInterface, provider: ProviderInterface) {
-        this.account = account;
-        this.provider = provider;
-        this.readerContract = new Contract(ABI, contractAddress, this.provider);
-        this.writerContract = new Contract(ABI, contractAddress, this.account);
+        this.readerContract = new Contract(ABI, contractAddress, provider);
+        this.writerContract = new Contract(ABI, contractAddress, account);
     }
 
-    async add(name: string) {
-        const nameToFelt = stringToFelt(name)
+    static async connectWeb3Wallet() {
+        const starknet = await connect();
+        await starknet?.enable({starknetVersion: "v4"})
 
-        await this.writerContract.storeName(nameToFelt)
+        if (starknet?.account && starknet?.provider) {
+            const starknetMainContract = new StarknetMainContract(starknet.account, starknet.provider);
+            starknetMainContract._connectedAddress = starknet?.selectedAddress
+
+            return starknetMainContract;
+        }
     }
 
-    async getNameFor(address: string) {
+    get connectedAddress(): string | undefined {
+        return this._connectedAddress;
+    }
+
+    public async getName(address: string) {
         const _name = await this.readerContract.getName(address)
         return feltToString(toBN(_name.toString()));
     }
+
+    public async storeName(name: string) {
+        await this.writerContract.storeName(stringToFelt(name))
+    }
 }
 
-function feltToString(felt) {
+class AddressNameMap {
+    private readonly contract: MainContract
+
+    constructor(contract: MainContract) {
+        this.contract = contract;
+    }
+
+    async add(name: string) {
+        await this.contract.storeName(name);
+    }
+
+    async getNameFor(address: string) {
+        return await this.contract.getName(address);
+    }
+}
+
+function feltToString(felt): string {
     const newStrB = Buffer.from(felt.toString(16), 'hex')
     return newStrB.toString()
 }
