@@ -14,36 +14,28 @@ export default function Home() {
     const addressNameMapRef = useRef<AddressNameMap>();
 
     async function connectWallet() {
-        try {
+        const action = async () => {
             const mainContract = await StarknetMainContract.connectWeb3Wallet()
             addressNameMapRef.current = new AddressNameMap(mainContract);
 
             setAddress(mainContract.connectedAddress)
             setIsConnected(true)
-
-        } catch (e) {
-            alert(e.message)
-            console.error(e)
         }
+        await perform(action);
     }
 
     async function setNameFunction() {
-        try {
+        const action = async () => {
             await addressNameMapRef.current?.add(name)
             alert("You've successfully associated your name with this address!")
-        } catch (e) {
-            alert(e.message)
-            console.error(e)
         }
+
+        await perform(action)
     }
 
     async function getNameFunction() {
-        try {
-            await setRetrievedName(await addressNameMapRef.current?.getNameFor(inputAddress))
-        } catch (e) {
-            alert(e.message)
-            console.error(e)
-        }
+        const action = async () => setRetrievedName(await addressNameMapRef.current?.getNameFor(inputAddress))
+        await perform(action)
     }
 
     return (
@@ -158,5 +150,14 @@ class AddressNameMap {
 
     async getNameFor(address: string) {
         return await this.contract.getName(address);
+    }
+}
+
+async function perform(action: () => Promise<void>) {
+    try {
+        await action()
+    } catch (e) {
+        alert(e.message)
+        console.error(e)
     }
 }
