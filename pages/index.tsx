@@ -1,5 +1,5 @@
 import {connect} from "get-starknet"
-import {useState} from "react";
+import {useRef, useState} from "react";
 import {AccountInterface, Contract, ProviderInterface} from "starknet";
 import {toBN} from "starknet/dist/utils/number"
 import ABI from "../abis/main-abi.json"
@@ -11,12 +11,12 @@ export default function Home() {
     const [retrievedName, setRetrievedName] = useState('')
     const [isConnected, setIsConnected] = useState(false)
 
-    let addressNameMap: AddressNameMap;
+    const addressNameMapRef = useRef<AddressNameMap>();
 
     async function connectWallet() {
         try {
             const mainContract = await StarknetMainContract.connectWeb3Wallet()
-            addressNameMap = new AddressNameMap(mainContract);
+            addressNameMapRef.current = new AddressNameMap(mainContract);
 
             setAddress(mainContract.connectedAddress)
             setIsConnected(true)
@@ -29,7 +29,7 @@ export default function Home() {
 
     async function setNameFunction() {
         try {
-            await addressNameMap.add(name)
+            await addressNameMapRef.current?.add(name)
             alert("You've successfully associated your name with this address!")
         } catch (e) {
             alert(e.message)
@@ -39,7 +39,7 @@ export default function Home() {
 
     async function getNameFunction() {
         try {
-            setRetrievedName(await addressNameMap.getNameFor(inputAddress))
+            await setRetrievedName(await addressNameMapRef.current?.getNameFor(inputAddress))
         } catch (e) {
             alert(e.message)
             console.error(e)
