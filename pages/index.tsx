@@ -106,16 +106,19 @@ class StarknetMainContract implements MainContract {
     private readonly readerContract: Contract;
     private readonly writerContract: Contract;
 
+    private readonly provider: ProviderInterface;
+
     private _connectedAddress: string | undefined;
 
     constructor(account: AccountInterface, provider: ProviderInterface) {
         this.readerContract = new Contract(ABI, contractAddress, provider);
         this.writerContract = new Contract(ABI, contractAddress, account);
+        this.provider = provider;
     }
 
     static async connectWeb3Wallet() {
         const starknet = await connect();
-        await starknet?.enable({starknetVersion: "v4"})
+        await starknet?.enable()
 
         if (starknet?.account && starknet?.provider) {
             const starknetMainContract = new StarknetMainContract(starknet.account, starknet.provider);
@@ -131,11 +134,14 @@ class StarknetMainContract implements MainContract {
 
     public async getName(address: string) {
         const _name = await this.readerContract.getName(address)
-        return feltToString(toBN(_name.toString()));
+        const bn = toBN(_name.toString());
+        return Buffer.from(bn.toString(16), 'hex').toString();
     }
 
     public async storeName(name: string) {
-        await this.writerContract.storeName(stringToFelt(name))
+        const felt = "0x" + Buffer.from(name).toString('hex');
+        const { transaction_hash } = await this.writerContract.storeName(felt);
+        await this.provider.waitForTransaction(transaction_hash)
     }
 }
 
@@ -153,13 +159,4 @@ class AddressNameMap {
     async getNameFor(address: string) {
         return await this.contract.getName(address);
     }
-}
-
-function feltToString(felt): string {
-    const newStrB = Buffer.from(felt.toString(16), 'hex')
-    return newStrB.toString()
-}
-
-function stringToFelt(str) {
-    return "0x" + Buffer.from(str).toString('hex')
 }
